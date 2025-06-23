@@ -29,6 +29,9 @@ bool FlightDataManager::fetchData()
             return false;
         }
         Serial.println("JSON parsing successful.");
+        DisplayManager::setWeatherInfo(
+            doc["weather"]["temperature"].as<String>(),
+            doc["weather"]["humidity"].as<String>());
 
         // Check if flight data is actually available
         if (doc["flightDataAvailable"].is<bool>() && doc["flightDataAvailable"].as<bool>() == false)

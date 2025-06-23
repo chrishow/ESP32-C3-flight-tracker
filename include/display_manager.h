@@ -29,6 +29,7 @@ public:
     static void displayWiFiStrength();
     static void displayFlightData(const JsonDocument &flightData);
     static void displayTime();
+    static void setWeatherInfo(const String &temperature, const String &humidity);
 
 private:
     static String getValueOrQuestion(const JsonDocument &data, const char *key);

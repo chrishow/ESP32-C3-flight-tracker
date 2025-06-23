@@ -7,6 +7,10 @@ Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RS
 bool isDisplayInitialized = false;
 String currentFlightNumber = "";
 String currentTimeString = "";
+String currentTemperature = "";
+String currentHumidity = "";
+String newTemperature = "";
+String newHumidity = "";
 
 void DisplayManager::initDisplay()
 {
@@ -100,6 +104,12 @@ void DisplayManager::displayTime()
     }
 }
 
+void DisplayManager::setWeatherInfo(const String &temperature, const String &humidity)
+{
+    newTemperature = temperature;
+    newHumidity = humidity;
+}
+
 void DisplayManager::drawTime()
 {
     // Erase any existing time string
@@ -125,10 +135,33 @@ void DisplayManager::drawTime()
 
     // Temp
     tft.setFont(&FreeMonoBold12pt7b);
-    tft.setCursor(3, 85);
-    tft.print("25.0C");
-    tft.setCursor(3, 105);
-    tft.print("55%");
+    if (currentTemperature != newTemperature && !newTemperature.isEmpty())
+    {
+        // Erase current temperature string
+        tft.setCursor(3, 85);
+        tft.setTextColor(ST77XX_BLACK);
+        tft.print(currentTemperature + "C");
+        currentTemperature = newTemperature;
+
+        tft.setCursor(3, 85);
+        tft.setTextColor(ST77XX_GREEN);
+        tft.setCursor(3, 85);
+        tft.print(currentTemperature + "C");
+    }
+
+    // Humidity
+    if (currentHumidity != newHumidity && !newHumidity.isEmpty())
+    {
+        // Erase current humidity string
+        tft.setCursor(3, 105);
+        tft.setTextColor(ST77XX_BLACK);
+        tft.print(currentHumidity + "%");
+        currentHumidity = newHumidity;
+
+        tft.setTextColor(ST77XX_GREEN);
+        tft.setCursor(3, 105);
+        tft.print(currentHumidity + "%");
+    }
 }
 
 String DisplayManager::getValueOrQuestion(const JsonDocument &data, const char *key)
