@@ -1,5 +1,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
+#include <ArduinoJson.h>
+
 #include "DSEG14Modern_Bold18pt7b.h"
 // #include "DSEGWeather18pt7b.h"
 #include <Fonts/FreeMonoBold12pt7b.h>
@@ -25,6 +27,10 @@ public:
     static void displayAPInfo(const String &apName, const String &password, const String &ip);
     static void drawError(const char *message);
     static void displayWiFiStrength();
+    static void displayFlightData(const JsonDocument &flightData);
+    static void displayTime();
 
 private:
+    static String getValueOrQuestion(const JsonDocument &data, const char *key);
+    static String getCurrentTimeString();
 };

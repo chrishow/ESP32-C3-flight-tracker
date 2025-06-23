@@ -1,5 +1,6 @@
 #include "ft_wifi_manager.h"
 #include "display_manager.h"
+#include <time.h>
 // #include "config.h"
 
 WiFiManager FtWiFiManager::wm;
@@ -23,6 +24,11 @@ bool FtWiFiManager::connect()
         Serial.println("Connected to WiFi successfully!");
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
+
+        // Initialize NTP time synchronization
+        configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+        Serial.println("NTP time synchronization initialized");
+
         return true;
     }
     else

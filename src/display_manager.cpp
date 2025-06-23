@@ -1,9 +1,12 @@
 #include <Arduino.h>
 #include "display_manager.h"
 #include "ft_wifi_manager.h"
+#include <sys/time.h>
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 bool isDisplayInitialized = false;
+String currentFlightNumber = "";
+String currentTimeString = "";
 
 void DisplayManager::initDisplay()
 {
@@ -89,17 +92,36 @@ void DisplayManager::drawError(const char *message)
     Serial.println("=== Error Displayed ===");
 }
 
+void DisplayManager::displayTime()
+{
+    if (currentFlightNumber == "")
+    {
+        drawTime();
+    }
+}
+
 void DisplayManager::drawTime()
 {
+    // Erase any existing time string
 
     tft.drawRect(0, 3, 128, 127, ST77XX_GREEN);
-    tft.setTextColor(ST77XX_GREEN);
     tft.setTextSize(1);
     tft.setFont(&DSEG14Modern_Bold18pt7b);
 
     // Time
+    String currentTime = getCurrentTimeString();
+    if (currentTime != currentTimeString)
+    {
+        // Erase current time string
+        tft.setCursor(3, 55);
+        tft.setTextColor(ST77XX_BLACK);
+        tft.print(currentTimeString);
+        currentTimeString = currentTime;
+    }
+
     tft.setCursor(3, 55);
-    tft.print("23:45");
+    tft.setTextColor(ST77XX_GREEN);
+    tft.print(currentTime);
 
     // Temp
     tft.setFont(&FreeMonoBold12pt7b);
@@ -109,10 +131,59 @@ void DisplayManager::drawTime()
     tft.print("55%");
 }
 
-void DisplayManager::drawFlight(const char *airport, const char *aircraft, const char *flightNumber)
+String DisplayManager::getValueOrQuestion(const JsonDocument &data, const char *key)
+{
+    if (data[key].is<String>())
+    {
+        String value = data[key].as<String>();
+        if (value == "null" || value.isEmpty())
+        {
+            return "?";
+        }
+        return value;
+    }
+    return "?";
+}
+
+void DisplayManager::displayFlightData(const JsonDocument &flightData)
 {
 
-    // tft.drawCircle(64, 64, 30, ST77XX_WHITE);
+    if (flightData.isNull() || !flightData["callsign"].is<String>() ||
+        flightData["callsign"].as<String>() == "null" ||
+        flightData["callsign"].as<String>().isEmpty())
+    {
+        Serial.println("No flight data to display or callsign is null/empty.");
+        if (currentFlightNumber != "")
+        {
+            clearScreen();
+        }
+        currentFlightNumber = "";
+        return;
+    }
+
+    Serial.println("Updating display with flight data...");
+
+    String airline = getValueOrQuestion(flightData, "airlineIcao");
+    String flightNumber = getValueOrQuestion(flightData, "number");
+    String origin = getValueOrQuestion(flightData, "originAirportIata");
+    String destination = getValueOrQuestion(flightData, "destinationAirportIata");
+    String aircraftCode = getValueOrQuestion(flightData, "aircraftCode");
+
+    if (destination != "SPC")
+    {
+        destination = origin;
+    }
+    drawFlight(destination.c_str(), aircraftCode.c_str(), flightNumber.c_str());
+}
+
+void DisplayManager::drawFlight(const char *airport, const char *aircraft, const char *flightNumber)
+{
+    if (currentFlightNumber != flightNumber)
+    {
+        clearScreen();
+    }
+    currentFlightNumber = flightNumber;
+
     tft.drawRect(0, 3, 128, 127, ST77XX_YELLOW);
     tft.setTextColor(ST77XX_YELLOW);
     tft.setTextSize(1);
@@ -124,9 +195,9 @@ void DisplayManager::drawFlight(const char *airport, const char *aircraft, const
 
     // Aircraft
     tft.setFont(&FreeMonoBold12pt7b);
-    tft.setCursor(3, 85);
+    tft.setCursor(5, 85);
     tft.print(aircraft);
-    tft.setCursor(3, 105);
+    tft.setCursor(5, 105);
     tft.print(flightNumber);
 }
 
@@ -158,4 +229,23 @@ void DisplayManager::displayAPInfo(const String &apName, const String &password,
     Serial.printf("Password: %s\n", password.c_str());
     Serial.printf("IP: %s\n", ip.c_str());
     Serial.println("Connect and browse to 192.168.4.1");
+}
+
+String DisplayManager::getCurrentTimeString()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    Serial.printf("Raw timestamp: %ld seconds since epoch\n", tv.tv_sec);
+
+    // Convert to local time
+    struct tm *timeinfo = localtime(&tv.tv_sec);
+
+    Serial.printf("Converted time: %02d:%02d:%02d\n", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+
+    // Format as HH:MM
+    char timeStr[6];
+    snprintf(timeStr, sizeof(timeStr), "%02d:%02d", timeinfo->tm_hour, timeinfo->tm_min);
+
+    return String(timeStr);
 }
