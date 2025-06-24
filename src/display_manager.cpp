@@ -37,66 +37,36 @@ void DisplayManager::clearScreen()
 
 void DisplayManager::displayWiFiStrength()
 {
-    int iconWidth = 22;
-    int iconHeight = 8;
-    int iconX = SCREEN_WIDTH - iconWidth;
+    int iconX = SCREEN_WIDTH - WIFI_ICON_WIDTH;
     int iconY = 5;
-
-    // tft.fillRect(iconX, iconY, iconWidth, iconHeight, ST77XX_BLACK);
 
     if (!FtWiFiManager::isConnected())
     {
         tft.setTextSize(1);
         tft.setTextColor(ST77XX_GREEN);
-        tft.setCursor(iconX + (iconWidth - 5) / 2, iconY + (iconHeight - 8) / 2);
+        tft.setCursor(iconX + (WIFI_ICON_WIDTH - 5) / 2, iconY + (WIFI_ICON_HEIGHT - 8) / 2);
         tft.print("X");
         return;
     }
 
     long rssi = FtWiFiManager::getRSSI();
-    int bars = 0;
-    if (rssi >= -55)
-        bars = 4;
-    else if (rssi >= -65)
-        bars = 3;
-    else if (rssi >= -75)
-        bars = 2;
-    else
-        bars = 1;
+    int bars = calculateWiFiBars(rssi);
 
-    int barWidth = 2;
-    int barSpacing = 2;
-    int totalBarsWidth = (4 * barWidth) + (3 * barSpacing);
-    int currentX = iconX + (iconWidth - totalBarsWidth) / 2;
+    int totalBarsWidth = (4 * WIFI_BAR_WIDTH) + (3 * WIFI_BAR_SPACING);
+    int startX = iconX + (WIFI_ICON_WIDTH - totalBarsWidth) / 2;
 
-    // Draw bars from shortest to tallest (ascending height)
-    for (int i = 1; i <= 4; i++)
-    {
-        int barHeight = i * 2;
-        int barY = iconY + (8 - barHeight);
-
-        if (bars >= i)
-        {
-            tft.fillRect(currentX, barY, barWidth, barHeight, ST77XX_GREEN);
-        }
-        else
-        {
-            tft.fillRect(currentX, barY, barWidth, barHeight, ST77XX_BLACK);
-        }
-        currentX += (barWidth + barSpacing);
-    }
+    drawWiFiBars(bars, startX, iconY);
 }
 
 void DisplayManager::drawError(const char *message)
 {
-
     tft.fillScreen(ST77XX_RED);
     tft.setTextColor(ST77XX_WHITE);
     tft.setTextSize(1);
-    tft.setFont(&DSEG14Modern_Bold18pt7b);
+    tft.setFont(&FreeMonoBold12pt7b);
 
     // Display error message
-    tft.setCursor(3, 50);
+    tft.setCursor(BORDER_OFFSET, 50);
     tft.print(message);
 
     Serial.println("=== Error Displayed ===");
@@ -118,56 +88,39 @@ void DisplayManager::setWeatherInfo(const String &temperature, const String &hum
 
 void DisplayManager::drawTime()
 {
-    // Erase any existing time string
-
-    tft.drawRect(0, 3, 128, 127, ST77XX_GREEN);
+    drawBorderedRect(ST77XX_GREEN);
     tft.setTextSize(1);
-    tft.setFont(&DSEG14Modern_Bold18pt7b);
 
-    // Time
+    // Update time display
     String currentTime = getCurrentTimeString();
     if (currentTime != currentTimeString && currentTime != "00:00")
     {
-        // Erase current time string
-        tft.setCursor(3, 55);
-        tft.setTextColor(ST77XX_BLACK);
-        tft.print(currentTimeString);
+        drawTextWithErase(BORDER_OFFSET, TIME_Y_POS, currentTimeString, currentTime,
+                          ST77XX_GREEN, &DSEG14ModernMini_Bold18pt7b);
         currentTimeString = currentTime;
-
-        tft.setCursor(3, 55);
-        tft.setTextColor(ST77XX_GREEN);
-        tft.print(currentTime);
         Serial.printf("Current time: %s\n", currentTime.c_str());
     }
 
-    // Temp
-    tft.setFont(&FreeMonoBold12pt7b);
+    // Update temperature display
     if (currentTemperature != newTemperature && !newTemperature.isEmpty())
     {
-        // Erase current temperature string
-        tft.setCursor(3, 85);
-        tft.setTextColor(ST77XX_BLACK);
-        tft.print(currentTemperature + "C");
-        currentTemperature = newTemperature;
+        String oldTempText = currentTemperature.isEmpty() ? "" : currentTemperature + "C";
+        String newTempText = newTemperature + "C";
 
-        tft.setCursor(3, 85);
-        tft.setTextColor(ST77XX_GREEN);
-        tft.setCursor(3, 85);
-        tft.print(currentTemperature + "C");
+        drawTextWithErase(BORDER_OFFSET, TEMP_Y_POS, oldTempText, newTempText,
+                          ST77XX_GREEN, &FreeMonoBold12pt7b);
+        currentTemperature = newTemperature;
     }
 
-    // Humidity
+    // Update humidity display
     if (currentHumidity != newHumidity && !newHumidity.isEmpty())
     {
-        // Erase current humidity string
-        tft.setCursor(3, 105);
-        tft.setTextColor(ST77XX_BLACK);
-        tft.print(currentHumidity + "%");
-        currentHumidity = newHumidity;
+        String oldHumidityText = currentHumidity.isEmpty() ? "" : currentHumidity + "%";
+        String newHumidityText = newHumidity + "%";
 
-        tft.setTextColor(ST77XX_GREEN);
-        tft.setCursor(3, 105);
-        tft.print(currentHumidity + "%");
+        drawTextWithErase(BORDER_OFFSET, HUMIDITY_Y_POS, oldHumidityText, newHumidityText,
+                          ST77XX_GREEN, &FreeMonoBold12pt7b);
+        currentHumidity = newHumidity;
     }
 }
 
@@ -228,20 +181,20 @@ void DisplayManager::drawFlight(const char *airport, const char *aircraft, const
     }
     currentFlightNumber = flightNumber;
 
-    tft.drawRect(0, 3, 128, 127, ST77XX_YELLOW);
+    drawBorderedRect(ST77XX_YELLOW);
     tft.setTextColor(ST77XX_YELLOW);
     tft.setTextSize(1);
-    tft.setFont(&DSEG14Modern_Bold18pt7b);
 
-    // Destination
-    tft.setCursor(3, 55);
+    // Display airport destination
+    tft.setFont(&DSEG14ModernMini_Bold18pt7b);
+    tft.setCursor(BORDER_OFFSET, AIRPORT_Y_POS);
     tft.print(airport);
 
-    // Aircraft
+    // Display aircraft and flight number
     tft.setFont(&FreeMonoBold12pt7b);
-    tft.setCursor(5, 85);
+    tft.setCursor(5, AIRCRAFT_Y_POS);
     tft.print(aircraft);
-    tft.setCursor(5, 105);
+    tft.setCursor(5, FLIGHT_NUM_Y_POS);
     tft.print(flightNumber);
 }
 
@@ -292,4 +245,63 @@ String DisplayManager::getCurrentTimeString()
     snprintf(timeStr, sizeof(timeStr), "%02d:%02d", timeinfo->tm_hour, timeinfo->tm_min);
 
     return String(timeStr);
+}
+
+// Helper function to draw text with automatic erasing of old text
+void DisplayManager::drawTextWithErase(int x, int y, const String &oldText, const String &newText,
+                                       uint16_t color, const GFXfont *font)
+{
+    if (font)
+    {
+        tft.setFont(font);
+    }
+
+    // Erase old text by drawing it in black
+    if (!oldText.isEmpty())
+    {
+        tft.setCursor(x, y);
+        tft.setTextColor(ST77XX_BLACK);
+        tft.print(oldText);
+    }
+
+    // Draw new text in specified color
+    if (!newText.isEmpty())
+    {
+        tft.setCursor(x, y);
+        tft.setTextColor(color);
+        tft.print(newText);
+    }
+}
+
+// Helper function to draw bordered rectangle
+void DisplayManager::drawBorderedRect(uint16_t color)
+{
+    tft.drawRect(0, BORDER_OFFSET, SCREEN_WIDTH, SCREEN_HEIGHT - BORDER_OFFSET, color);
+}
+
+// Helper function to calculate WiFi signal bars
+int DisplayManager::calculateWiFiBars(long rssi)
+{
+    if (rssi >= -55)
+        return 4;
+    else if (rssi >= -65)
+        return 3;
+    else if (rssi >= -75)
+        return 2;
+    else
+        return 1;
+}
+
+// Helper function to draw WiFi signal bars
+void DisplayManager::drawWiFiBars(int bars, int startX, int startY)
+{
+    for (int i = 1; i <= 4; i++)
+    {
+        int barHeight = i * 2;
+        int barY = startY + (WIFI_ICON_HEIGHT - barHeight);
+        uint16_t barColor = (bars >= i) ? ST77XX_GREEN : ST77XX_BLACK;
+
+        tft.fillRect(startX, barY, WIFI_BAR_WIDTH, barHeight, barColor);
+        startX += (WIFI_BAR_WIDTH + WIFI_BAR_SPACING);
+    }
 }
