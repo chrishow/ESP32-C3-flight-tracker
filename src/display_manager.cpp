@@ -161,7 +161,7 @@ void DisplayManager::displayFlightData(const JsonDocument &flightData)
     Serial.println("Updating display with flight data...");
 
     String airline = getValueOrQuestion(flightData, "airlineIcao");
-    String flightNumber = getValueOrQuestion(flightData, "number");
+    String flightNumber = getValueOrQuestion(flightData, "callsign");
     String origin = getValueOrQuestion(flightData, "originAirportIata");
     String destination = getValueOrQuestion(flightData, "destinationAirportIata");
     String aircraftCode = getValueOrQuestion(flightData, "aircraftCode");
