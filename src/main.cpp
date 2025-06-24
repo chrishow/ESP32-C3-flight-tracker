@@ -5,7 +5,24 @@
 #include "flight_data_manager.h"
 #include "weather_manager.h"
 
-bool firstRun = true;
+// Timing constants (in milliseconds)
+const unsigned long NIGHT_FLIGHT_UPDATE_INTERVAL = 3600000; // 1 hour during night
+const unsigned long DAY_FLIGHT_UPDATE_INTERVAL = 20000;     // 20 seconds during day
+const unsigned long WEATHER_UPDATE_INTERVAL = 600000;       // 10 minutes
+const unsigned long DISPLAY_REFRESH_INTERVAL = 100;         // 100ms for time/WiFi updates
+const unsigned long NIGHT_START_HOUR = 22;                  // 10 PM
+const unsigned long NIGHT_END_HOUR = 7;                     // 7 AM
+
+// Application state
+struct AppState
+{
+    bool isInitialized = false;
+    unsigned long lastFlightUpdate = 0;
+    unsigned long lastWeatherUpdate = 0;
+    unsigned long lastDisplayRefresh = 0;
+};
+
+AppState appState;
 
 bool isNightHours()
 {
@@ -14,11 +31,15 @@ bool isNightHours()
     struct tm *timeinfo = localtime(&tv.tv_sec);
     int currentHour = timeinfo->tm_hour;
 
-    // Night hours: 22:00 to 07:00 (22, 23, 0, 1, 2, 3, 4, 5, 6)
-    return (currentHour >= 22 || currentHour < 7);
+    return (currentHour >= NIGHT_START_HOUR || currentHour < NIGHT_END_HOUR);
 }
 
-void setup()
+unsigned long getFlightUpdateInterval()
+{
+    return isNightHours() ? NIGHT_FLIGHT_UPDATE_INTERVAL : DAY_FLIGHT_UPDATE_INTERVAL;
+}
+
+void initializeSystem()
 {
     Serial.begin(9600);
     DisplayManager::initDisplay();
@@ -29,74 +50,101 @@ void setup()
         Serial.println("Failed to connect to WiFi. Halting.");
         DisplayManager::drawError("WiFi Connection Failed!");
         while (true)
-            ;
+        {
+            delay(1000); // Prevent watchdog reset
+        }
     }
+
+    Serial.println("System initialization complete");
 }
 
-void getLatestFlightData()
+void setup()
 {
-    if (FtWiFiManager::isConnected())
-    {
-        Serial.println("Fetching latest flight data...");
+    initializeSystem();
+}
 
-        FlightDataManager::fetchData();
-        Serial.println("Flight data updated.");
-    }
-    else
+bool shouldUpdateFlight()
+{
+    return !appState.isInitialized ||
+           (millis() - appState.lastFlightUpdate > getFlightUpdateInterval());
+}
+
+bool shouldUpdateWeather()
+{
+    return !appState.isInitialized ||
+           (millis() - appState.lastWeatherUpdate > WEATHER_UPDATE_INTERVAL);
+}
+
+bool shouldRefreshDisplay()
+{
+    return !appState.isInitialized ||
+           (millis() - appState.lastDisplayRefresh > DISPLAY_REFRESH_INTERVAL);
+}
+
+void updateFlightData()
+{
+    if (!FtWiFiManager::isConnected())
     {
         Serial.println("WiFi not connected, cannot fetch flight data.");
         DisplayManager::drawError("No WiFi Connection!");
+        return;
     }
+
+    Serial.println("Fetching latest flight data...");
+    FlightDataManager::fetchData();
+    appState.lastFlightUpdate = millis();
+    Serial.println("Flight data updated.");
 }
 
-void getWeatherData()
+void updateWeatherData()
 {
-    if (FtWiFiManager::isConnected())
+    if (!FtWiFiManager::isConnected())
     {
-        Serial.println("Fetching weather data...");
-        WeatherManager::fetchData();
+        Serial.println("WiFi not connected, cannot fetch weather data.");
+        return;
     }
+
+    Serial.println("Fetching weather data...");
+    WeatherManager::fetchData();
+    appState.lastWeatherUpdate = millis();
+}
+
+void refreshDisplay()
+{
+    DisplayManager::displayTime();
+    DisplayManager::displayWiFiStrength();
+    appState.lastDisplayRefresh = millis();
 }
 
 void loop()
 {
-    // Simple heartbeat with backlight toggle
-    static unsigned long lastDataFetch = 0;
-    static unsigned long lastWiFiSignalUpdate = 0;
-    static unsigned long lastWeatherUpdate = 0;
-    static bool backlightState = true;
-
-    // Dynamic flight data update interval based on time of day
-    int flightDataUpdateInterval;
-    if (isNightHours())
+    // Update weather data periodically
+    if (shouldUpdateWeather())
     {
-        flightDataUpdateInterval = 3600000; // 1 hour (3600 seconds * 1000 ms)
-    }
-    else
-    {
-        flightDataUpdateInterval = 20000; // 20 seconds
+        updateWeatherData();
     }
 
-    if (firstRun || millis() - lastWeatherUpdate > 600000) // Every 10 minutes
+    // Update display (time and WiFi signal) frequently
+    if (shouldRefreshDisplay())
     {
-        getWeatherData();
+        refreshDisplay();
     }
 
-    if (firstRun || millis() - lastWiFiSignalUpdate > 100)
+    // Update flight data based on time of day
+    if (shouldUpdateFlight())
     {
-        // Serial.println("Updating WiFi signal strength");
-        DisplayManager::displayTime(); // Update time display
-        DisplayManager::displayWiFiStrength();
-        lastWiFiSignalUpdate = millis();
+        updateFlightData();
+        // Refresh display after flight data update
+        refreshDisplay();
     }
 
-    if (firstRun || millis() - lastDataFetch > flightDataUpdateInterval)
+    // Mark system as initialized after first cycle
+    if (!appState.isInitialized)
     {
-        getLatestFlightData();
-
-        lastDataFetch = millis();
-        DisplayManager::displayWiFiStrength();
+        appState.isInitialized = true;
+        Serial.println("Application fully initialized");
     }
 
-    firstRun = false;
+    // Small delay to prevent excessive CPU usage
+    delay(10);
 }
