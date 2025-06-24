@@ -1,10 +1,11 @@
 #include <Arduino.h>
+#include <SPI.h>
 #include "display_manager.h"
 #include "ft_wifi_manager.h"
 #include <sys/time.h>
 
-Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
-// Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+// Initialize display using hardware SPI (CS, DC, RST pins only)
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 bool isDisplayInitialized = false;
 String currentFlightNumber = "";
@@ -18,7 +19,10 @@ void DisplayManager::initDisplay()
 {
     if (!isDisplayInitialized)
     {
-        // Initialize the display
+        // Initialize hardware SPI with custom pins
+        SPI.begin(TFT_SCLK, -1, TFT_MOSI, -1); // (SCK, MISO, MOSI, SS)
+
+        // Initialize the display with hardware SPI
         tft.initR(INITR_GREENTAB);    // Initialize with green tab settings
         tft.fillScreen(ST77XX_BLACK); // Clear the screen to black
 
