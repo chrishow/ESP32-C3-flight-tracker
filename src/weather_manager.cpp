@@ -1,14 +1,14 @@
 #include <sys/time.h>
-#include "flight_data_manager.h"
+#include "weather_manager.h"
 #include "display_manager.h"
 #include <Arduino.h>
 
-const char *API_URL = "https://flighttrack.primesolid.com/testX";
+HTTPClient WeatherManager::httpClient;
 
-HTTPClient FlightDataManager::httpClient;
-
-bool FlightDataManager::fetchData()
+bool WeatherManager::fetchData()
 {
+    String API_URL = "https://api.open-meteo.com/v1/forecast?latitude=28.652107&longitude=-17.7754653&current=temperature_2m,relative_humidity_2m";
+
     Serial.println("Attempting to fetch data from URL: " + String(API_URL));
     httpClient.begin(API_URL);
     int httpCode = httpClient.GET();
@@ -29,14 +29,9 @@ bool FlightDataManager::fetchData()
             return false;
         }
         Serial.println("JSON parsing successful.");
-
-        // Check if flight data is actually available
-        if (doc["flightDataAvailable"].is<bool>() && doc["flightDataAvailable"].as<bool>() == false)
-        {
-            Serial.println("No flight data available according to API.");
-        }
-        DisplayManager::displayFlightData(doc);
-
+        DisplayManager::setWeatherInfo(
+            doc["current"]["temperature_2m"].as<String>(),
+            doc["current"]["relative_humidity_2m"].as<String>());
         return true;
     }
     else

@@ -4,6 +4,8 @@
 #include <sys/time.h>
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
+// Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+
 bool isDisplayInitialized = false;
 String currentFlightNumber = "";
 String currentTimeString = "";
@@ -120,18 +122,19 @@ void DisplayManager::drawTime()
 
     // Time
     String currentTime = getCurrentTimeString();
-    if (currentTime != currentTimeString)
+    if (currentTime != currentTimeString && currentTime != "00:00")
     {
         // Erase current time string
         tft.setCursor(3, 55);
         tft.setTextColor(ST77XX_BLACK);
         tft.print(currentTimeString);
         currentTimeString = currentTime;
-    }
 
-    tft.setCursor(3, 55);
-    tft.setTextColor(ST77XX_GREEN);
-    tft.print(currentTime);
+        tft.setCursor(3, 55);
+        tft.setTextColor(ST77XX_GREEN);
+        tft.print(currentTime);
+        Serial.printf("Current time: %s\n", currentTime.c_str());
+    }
 
     // Temp
     tft.setFont(&FreeMonoBold12pt7b);
@@ -191,6 +194,10 @@ void DisplayManager::displayFlightData(const JsonDocument &flightData)
             clearScreen();
         }
         currentFlightNumber = "";
+        // Unset time and weather info so they will be redrawn
+        currentHumidity = "";
+        currentTemperature = "";
+        currentTimeString = "";
         return;
     }
 
@@ -202,7 +209,7 @@ void DisplayManager::displayFlightData(const JsonDocument &flightData)
     String destination = getValueOrQuestion(flightData, "destinationAirportIata");
     String aircraftCode = getValueOrQuestion(flightData, "aircraftCode");
 
-    if (destination != "SPC")
+    if (destination == "SPC")
     {
         destination = origin;
     }
@@ -266,15 +273,15 @@ void DisplayManager::displayAPInfo(const String &apName, const String &password,
 
 String DisplayManager::getCurrentTimeString()
 {
+    // Set timezone to London (handles GMT/BST automatically)
+    setenv("TZ", "GMT0BST,M3.5.0/1,M10.5.0", 1);
+    tzset();
+
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
-    Serial.printf("Raw timestamp: %ld seconds since epoch\n", tv.tv_sec);
-
-    // Convert to local time
+    // Convert to London local time (automatically handles GMT/BST)
     struct tm *timeinfo = localtime(&tv.tv_sec);
-
-    Serial.printf("Converted time: %02d:%02d:%02d\n", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 
     // Format as HH:MM
     char timeStr[6];

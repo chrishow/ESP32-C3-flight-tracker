@@ -1,10 +1,22 @@
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include "display_manager.h"
 #include "ft_wifi_manager.h"
 #include "flight_data_manager.h"
-#include <ArduinoJson.h>
+#include "weather_manager.h"
 
 bool firstRun = true;
+
+bool isNightHours()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    struct tm *timeinfo = localtime(&tv.tv_sec);
+    int currentHour = timeinfo->tm_hour;
+
+    // Night hours: 22:00 to 07:00 (22, 23, 0, 1, 2, 3, 4, 5, 6)
+    return (currentHour >= 22 || currentHour < 7);
+}
 
 void setup()
 {
@@ -19,12 +31,9 @@ void setup()
         while (true)
             ;
     }
-
-    // DisplayManager::drawTime();
-    // drawFlight("LPA", "AT76", "NT307");
 }
 
-void getLatestData()
+void getLatestFlightData()
 {
     if (FtWiFiManager::isConnected())
     {
@@ -40,13 +49,38 @@ void getLatestData()
     }
 }
 
+void getWeatherData()
+{
+    if (FtWiFiManager::isConnected())
+    {
+        Serial.println("Fetching weather data...");
+        WeatherManager::fetchData();
+    }
+}
+
 void loop()
 {
-
     // Simple heartbeat with backlight toggle
     static unsigned long lastDataFetch = 0;
     static unsigned long lastWiFiSignalUpdate = 0;
+    static unsigned long lastWeatherUpdate = 0;
     static bool backlightState = true;
+
+    // Dynamic flight data update interval based on time of day
+    int flightDataUpdateInterval;
+    if (isNightHours())
+    {
+        flightDataUpdateInterval = 3600000; // 1 hour (3600 seconds * 1000 ms)
+    }
+    else
+    {
+        flightDataUpdateInterval = 20000; // 20 seconds
+    }
+
+    if (firstRun || millis() - lastWeatherUpdate > 600000) // Every 10 minutes
+    {
+        getWeatherData();
+    }
 
     if (firstRun || millis() - lastWiFiSignalUpdate > 100)
     {
@@ -56,10 +90,9 @@ void loop()
         lastWiFiSignalUpdate = millis();
     }
 
-    if (firstRun || millis() - lastDataFetch > 20000) // every 20s
+    if (firstRun || millis() - lastDataFetch > flightDataUpdateInterval)
     {
-        Serial.println("Getting flight data");
-        getLatestData();
+        getLatestFlightData();
 
         lastDataFetch = millis();
         DisplayManager::displayWiFiStrength();
