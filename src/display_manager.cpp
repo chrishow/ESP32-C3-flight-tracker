@@ -138,6 +138,7 @@ void DisplayManager::drawTime()
     String currentTime = getCurrentTimeString();
     if (currentTime != currentTimeString && currentTime != "00:00")
     {
+        Serial.printf("Time update: old='%s' new='%s'\n", currentTimeString.c_str(), currentTime.c_str());
         drawTextWithErase(BORDER_OFFSET, TIME_Y_POS, currentTimeString, currentTime,
                           ST77XX_GREEN, &DSEG14ModernMini_Bold18pt7b);
         currentTimeString = currentTime;
@@ -299,25 +300,31 @@ String DisplayManager::getCurrentTimeString()
 void DisplayManager::drawTextWithErase(int x, int y, const String &oldText, const String &newText,
                                        uint16_t color, const GFXfont *font)
 {
+    // Make local copies to prevent any potential string reference issues
+    String oldTextCopy = oldText;
+    String newTextCopy = newText;
+
     if (font)
     {
         tft.setFont(font);
     }
 
     // Erase old text by drawing it in black
-    if (!oldText.isEmpty())
+    if (!oldTextCopy.isEmpty())
     {
         tft.setCursor(x, y);
         tft.setTextColor(ST77XX_BLACK);
-        tft.print(oldText);
+        tft.print(oldTextCopy);
+        Serial.printf("Erasing old text: '%s' at (%d,%d)\n", oldTextCopy.c_str(), x, y);
     }
 
     // Draw new text in specified color
-    if (!newText.isEmpty())
+    if (!newTextCopy.isEmpty())
     {
         tft.setCursor(x, y);
         tft.setTextColor(color);
-        tft.print(newText);
+        tft.print(newTextCopy);
+        Serial.printf("Drawing new text: '%s' at (%d,%d)\n", newTextCopy.c_str(), x, y);
     }
 }
 
