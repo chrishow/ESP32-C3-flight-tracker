@@ -14,6 +14,8 @@ String currentTemperature = "";
 String currentHumidity = "";
 String newTemperature = "";
 String newHumidity = "";
+bool isInErrorState = false;
+String currentErrorMessage = "";
 
 void DisplayManager::initDisplay()
 {
@@ -33,16 +35,26 @@ void DisplayManager::initDisplay()
 void DisplayManager::clearScreen()
 {
     tft.fillScreen(ST77XX_BLACK);
+    // Reset error state when screen is cleared
+    isInErrorState = false;
+    currentErrorMessage = "";
 }
 
 void DisplayManager::displayWiFiStrength()
 {
+    // Don't draw WiFi strength if we're in error state
+    if (isInErrorState)
+    {
+        return;
+    }
+
     int iconX = SCREEN_WIDTH - WIFI_ICON_WIDTH;
     int iconY = 5;
 
     if (!FtWiFiManager::isConnected())
     {
         tft.setTextSize(1);
+        tft.setFont();
         tft.setTextColor(ST77XX_GREEN);
         tft.setCursor(iconX + (WIFI_ICON_WIDTH - 5) / 2, iconY + (WIFI_ICON_HEIGHT - 8) / 2);
         tft.print("X");
@@ -60,20 +72,45 @@ void DisplayManager::displayWiFiStrength()
 
 void DisplayManager::drawError(const char *message)
 {
-    tft.fillScreen(ST77XX_RED);
-    tft.setTextColor(ST77XX_WHITE);
-    tft.setTextSize(1);
-    tft.setFont(&FreeMonoBold12pt7b);
+    String messageStr = String(message);
 
-    // Display error message
-    tft.setCursor(BORDER_OFFSET, 50);
-    tft.print(message);
+    // Only redraw error if it's a new error message or we're not already in error state
+    if (!isInErrorState || currentErrorMessage != messageStr)
+    {
+        tft.fillScreen(ST77XX_RED);
+        tft.setTextColor(ST77XX_WHITE);
+        tft.setTextSize(1);
+        tft.setFont();
 
-    Serial.println("=== Error Displayed ===");
+        // Display error message
+        tft.setCursor(BORDER_OFFSET, 50);
+        tft.print(message);
+
+        isInErrorState = true;
+        currentErrorMessage = messageStr;
+        Serial.println("=== Error Displayed ===");
+    }
+}
+
+void DisplayManager::clearError()
+{
+    if (isInErrorState)
+    {
+        isInErrorState = false;
+        currentErrorMessage = "";
+        clearScreen();
+        Serial.println("=== Error State Cleared ===");
+    }
 }
 
 void DisplayManager::displayTime()
 {
+    // Only clear error state if WiFi is connected (meaning we can successfully display time)
+    if (FtWiFiManager::isConnected())
+    {
+        clearError();
+    }
+
     if (currentFlightNumber == "")
     {
         drawTime();
@@ -88,6 +125,12 @@ void DisplayManager::setWeatherInfo(const String &temperature, const String &hum
 
 void DisplayManager::drawTime()
 {
+    // Don't draw time if we're in error state
+    if (isInErrorState)
+    {
+        return;
+    }
+
     drawBorderedRect(ST77XX_GREEN);
     tft.setTextSize(1);
 
@@ -140,6 +183,11 @@ String DisplayManager::getValueOrQuestion(const JsonDocument &data, const char *
 
 void DisplayManager::displayFlightData(const JsonDocument &flightData)
 {
+    // Only clear error state if WiFi is connected
+    if (FtWiFiManager::isConnected())
+    {
+        clearError();
+    }
 
     if (flightData.isNull() || !flightData["callsign"].is<String>() ||
         flightData["callsign"].as<String>() == "null" ||

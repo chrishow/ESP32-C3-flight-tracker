@@ -51,6 +51,7 @@ public:
     static void drawFlight(const char *airport, const char *aircraft, const char *flightNumber);
     static void displayAPInfo(const String &apName, const String &password, const String &ip);
     static void drawError(const char *message);
+    static void clearError();
     static void displayWiFiStrength();
     static void displayFlightData(const JsonDocument &flightData);
     static void displayTime();
