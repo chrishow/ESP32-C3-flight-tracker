@@ -63,7 +63,7 @@ private:
                                   uint16_t color, const GFXfont *font = nullptr);
     static void drawBorderedRect(uint16_t color);
     static int calculateWiFiBars(long rssi);
-    static void drawWiFiBars(int bars, int startX, int startY);
+    static void drawWiFiBars(int bars, int startX, int startY, uint16_t activeColor = ST77XX_GREEN);
 
     // Data extraction helpers
     static String getValueOrQuestion(const JsonDocument &data, const char *key);

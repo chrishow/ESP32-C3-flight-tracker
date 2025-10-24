@@ -56,11 +56,14 @@ void DisplayManager::displayWiFiStrength()
     int iconX = SCREEN_WIDTH - WIFI_ICON_WIDTH;
     int iconY = 5;
 
+    // Choose color based on display mode: yellow for flight data, green for time display
+    uint16_t wifiColor = (currentFlightNumber != "") ? ST77XX_YELLOW : ST77XX_GREEN;
+
     if (!FtWiFiManager::isConnected())
     {
         tft.setTextSize(1);
         tft.setFont();
-        tft.setTextColor(ST77XX_GREEN);
+        tft.setTextColor(wifiColor);
         tft.setCursor(iconX + (WIFI_ICON_WIDTH - 5) / 2, iconY + (WIFI_ICON_HEIGHT - 8) / 2);
         tft.print("X");
         return;
@@ -72,7 +75,7 @@ void DisplayManager::displayWiFiStrength()
     int totalBarsWidth = (4 * WIFI_BAR_WIDTH) + (3 * WIFI_BAR_SPACING);
     int startX = iconX + (WIFI_ICON_WIDTH - totalBarsWidth) / 2;
 
-    drawWiFiBars(bars, startX, iconY);
+    drawWiFiBars(bars, startX, iconY, wifiColor);
 }
 
 void DisplayManager::drawError(const char *message)
@@ -353,13 +356,13 @@ int DisplayManager::calculateWiFiBars(long rssi)
 }
 
 // Helper function to draw WiFi signal bars
-void DisplayManager::drawWiFiBars(int bars, int startX, int startY)
+void DisplayManager::drawWiFiBars(int bars, int startX, int startY, uint16_t activeColor)
 {
     for (int i = 1; i <= 4; i++)
     {
         int barHeight = i * 2;
         int barY = startY + (WIFI_ICON_HEIGHT - barHeight);
-        uint16_t barColor = (bars >= i) ? ST77XX_GREEN : ST77XX_BLACK;
+        uint16_t barColor = (bars >= i) ? activeColor : ST77XX_BLACK;
 
         tft.fillRect(startX, barY, WIFI_BAR_WIDTH, barHeight, barColor);
         startX += (WIFI_BAR_WIDTH + WIFI_BAR_SPACING);
