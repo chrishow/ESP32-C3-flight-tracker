@@ -38,6 +38,11 @@ void DisplayManager::clearScreen()
     // Reset error state when screen is cleared
     isInErrorState = false;
     currentErrorMessage = "";
+    // Reset display state variables so first update after clear doesn't try to erase non-existent text
+    currentTimeString = "";
+    currentTemperature = "";
+    currentHumidity = "";
+    Serial.println("Screen cleared - reset display state variables");
 }
 
 void DisplayManager::displayWiFiStrength()
