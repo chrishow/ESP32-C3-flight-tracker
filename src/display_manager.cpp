@@ -206,12 +206,9 @@ void DisplayManager::displayFlightData(const JsonDocument &flightData)
         if (currentFlightNumber != "")
         {
             clearScreen();
+            // Note: clearScreen() already resets time/weather variables
         }
         currentFlightNumber = "";
-        // Unset time and weather info so they will be redrawn
-        currentHumidity = "";
-        currentTemperature = "";
-        currentTimeString = "";
         return;
     }
 
@@ -232,8 +229,10 @@ void DisplayManager::displayFlightData(const JsonDocument &flightData)
 
 void DisplayManager::drawFlight(const char *airport, const char *aircraft, const char *flightNumber)
 {
+    // Only clear screen when switching between different flights or from time to flight display
     if (currentFlightNumber != flightNumber)
     {
+        Serial.printf("Flight change: '%s' -> '%s', clearing screen\n", currentFlightNumber.c_str(), flightNumber);
         clearScreen();
     }
     currentFlightNumber = flightNumber;
